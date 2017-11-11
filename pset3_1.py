@@ -5,7 +5,7 @@ Created on Thu Nov  2 13:28:08 2017
 
 @author: shenhao
 """
-
+# test
 import os
 path = "/Volumes/Transcend/Dropbox (MIT)/2017 Fall/6.867/psets/pset3"
 data_path = path + '/hw3_resources/data'
