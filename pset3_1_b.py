@@ -43,7 +43,11 @@ def tanh_activation(M):
     return np.tanh(M)
 
 # Helper function to evaluate the total loss on the dataset
-def calculate_loss_batch(model):
+def calculate_error(model, X, y):
+    return null
+
+def calculate_loss_batch(model, X, y):
+    num_examples = np.size(X, 0)
     W1, b1, W2, b2 = model['W1'], model['b1'], model['W2'], model['b2']
     # Forward propagation to calculate our predictions
     z1 = X.dot(W1) + b1
@@ -77,8 +81,9 @@ def calculate_loss_stoch(model, x_pt, y_pt):
 # - nn_hdim: Number of nodes in the hidden layer
 # - num_passes: Number of passes through the training data for gradient descent
 # - print_loss: If True, print the loss every 1000 iterations
-def build_model(nn_hdim, num_passes=20000, print_loss=False):
+def build_model(nn_hdim, X, y, num_passes=20000, print_loss=False):
     # Initialize the parameters to random values. We need to learn these.
+    num_examples = np.size(X, 0)
     np.random.seed(0)
     W1 = np.random.randn(nn_input_dim, nn_hdim) / np.sqrt(nn_input_dim)
     b1 = np.zeros((1, nn_hdim))
@@ -125,13 +130,14 @@ def build_model(nn_hdim, num_passes=20000, print_loss=False):
         # This is expensive because it uses the whole dataset, so we don't want to do it too often.
         if print_loss and i % 1000 == 0:
             print(
-            "Loss after iteration %i: %f" % (i, calculate_loss(model))
+            "Loss after iteration %i: %f" % (i, calculate_loss_batch(model, X, y))
             )
 
     return model
 
-def build_model_SGD(nn_hdim, num_passes=500, print_loss=False):
+def build_model_SGD(nn_hdim, X, y, num_passes=500, print_loss=False):
     # Initialize the parameters to random values. We need to learn these.
+    num_examples = np.size(X, 0)
     loss_T = []
     np.random.seed(0)
     W1 = np.random.randn(nn_input_dim, nn_hdim) / np.sqrt(nn_input_dim)
@@ -174,7 +180,7 @@ def build_model_SGD(nn_hdim, num_passes=500, print_loss=False):
             dW1 += reg_lambda * W1
 
             # Gradient descent parameter update
-            epsilon = learning_rate_SGD((i*num_examples + j+1)/800, tau0 = 0.3, kap = 0.55)
+            epsilon = learning_rate_SGD((i*num_examples + j+1)/2000, tau0 = 0.3, kap = 0.55)
             W1 += -epsilon * dW1
             b1 += -epsilon * db1
             W2 += -epsilon * dW2
@@ -186,7 +192,7 @@ def build_model_SGD(nn_hdim, num_passes=500, print_loss=False):
         # Optionally print the loss.
         # This is expensive because it uses the whole dataset, so we don't want to do it too often.
         if print_loss and i % 10 == 0:
-            loss_T.append(calculate_loss_batch(model))
+            loss_T.append(calculate_loss_batch(model, X, y))
             print(
             "Loss after epoch %i: %f" % (i, loss_T[-1])
             )
@@ -194,4 +200,4 @@ def build_model_SGD(nn_hdim, num_passes=500, print_loss=False):
     return (model,loss_T)
 
 
-plt.plot(build_model_SGD(3, print_loss=True)[1])
+plt.plot(build_model_SGD(3, X, y, print_loss=True)[1])
