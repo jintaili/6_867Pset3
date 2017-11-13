@@ -43,6 +43,21 @@ def tanh_activation(M):
     '''
     return np.tanh(M)
 
+def predict(model, X):
+    num_examples = np.size(X, 0)
+    W_h, b_h = model['W_h'], model['b_h']
+    nn_hl = len(W_h) - 1
+    # Forward propagation to calculate our predictions
+    a = X
+    for i in range(nn_hl):
+        z = a.dot(W_h[i]) + b_h[i]
+        a = relu_activation(z)
+
+    z = a.dot(W_h[-1]) + b_h[-1]
+    exp_scores = np.exp(z)
+    probs = exp_scores / np.sum(exp_scores, axis=1, keepdims=True)
+    return probs
+
 # Helper function to evaluate the total loss on the dataset
 def calculate_error(model, X, y):
     num_examples = np.size(X, 0)
@@ -62,7 +77,7 @@ def calculate_error(model, X, y):
     same = sum(predict == y) / num_examples
     return 1-same
 
-def calculate_loss_batch(model, X, y):
+def calculate_loss_batch(model, X, y, reg_lambda):
     num_examples = np.size(X, 0)
     W_h, b_h = model['W_h'], model['b_h']
     nn_hl = len(W_h) - 1
@@ -151,7 +166,7 @@ def build_model(nn_hdim, X, y, num_passes=20000, print_loss=False):
         # This is expensive because it uses the whole dataset, so we don't want to do it too often.
         if print_loss and i % 1000 == 0:
             print(
-            "Loss after iteration %i: %f" % (i, calculate_loss_batch(model, X, y))
+            "Loss after iteration %i: %f" % (i, calculate_loss_batch(model, X, y, reg_lambda))
             )
 
     return model
@@ -213,7 +228,7 @@ def build_model_SGD_tanh(nn_hdim, X, y, num_passes=500, print_loss=False):
         # Optionally print the loss.
         # This is expensive because it uses the whole dataset, so we don't want to do it too often.
         if print_loss and i % 10 == 0:
-            loss_T.append(calculate_loss_batch(model, X, y))
+            loss_T.append(calculate_loss_batch(model, X, y, reg_lambda))
             print(
                 "Loss after epoch %i: %f" % (i, loss_T[-1])
             )
@@ -227,10 +242,13 @@ def build_model_SGD_tanh(nn_hdim, X, y, num_passes=500, print_loss=False):
 # with ReLU activations and softmax output, and returns the model.
 # - nn_hdim: A list length of the number of hidden layers,
 #           each element stands for the number of nodes in each layer.
-#           Currently this NN only has one output unit.
+# - X and y: input
+# - reg_lambda: Regularization coefficient.
+# - converge_error: Stop criterion: absolute difference in consecutive run loss.
 # - num_passes: Max number of Epochs through the training data for gradient descent
 # - print_loss: If True, print the loss every 10 epochs
-def build_model_SGD(nn_hdim, X, y, num_passes=150, print_loss=False):
+def build_model_SGD(nn_hdim, X, y, reg_lambda = 0.01, converge_error = 1e-4, epsilon = 0.01,
+                    num_passes=150, print_loss=False):
     # Initialize the parameters to random values. We need to learn these.
     nn_hl = len(nn_hdim)
     num_examples = np.size(X, 0)
@@ -320,8 +338,7 @@ def build_model_SGD(nn_hdim, X, y, num_passes=150, print_loss=False):
             # dW1 += reg_lambda * W1
 
             # Gradient descent parameter update
-            epsilon = learning_rate_SGD((i_t*num_examples + j+1)/2000, tau0 = 0.3, kap = 0.55)
-            epsilon = 0.01
+            # epsilon = learning_rate_SGD((i_t*num_examples + j+1)/2000, tau0 = 0.3, kap = 0.55)
             for i in range(len(W_h)):
                 W_h[i] += -epsilon * dW_h[i]
                 b_h[i] += -epsilon * db_h[i]
@@ -329,7 +346,7 @@ def build_model_SGD(nn_hdim, X, y, num_passes=150, print_loss=False):
             # Assign new parameters to the model
             model = {'W_h': W_h, 'b_h': b_h}
 
-        loss_T.append(calculate_loss_batch(model, X, y))
+        loss_T.append(calculate_loss_batch(model, X, y, reg_lambda))
         try:
             if np.abs(loss_T[-1] - loss_T[-2]) < converge_error:
                 print('Convergence reached!')
@@ -337,17 +354,72 @@ def build_model_SGD(nn_hdim, X, y, num_passes=150, print_loss=False):
         except: pass
         # Optionally print the loss.
         # This is expensive because it uses the whole dataset, so we don't want to do it too often.
-        if print_loss and i_t % 10 == 0:
+        if print_loss:# and i_t % 10 == 0:
             print(
-                "Loss after epoch %i: %f" % (i_t, loss_T[-1])
-            )
-            print(
-                "Error after epoch %i: %f" % (i_t, calculate_error(model, X, y))
+                "After epoch %i - Loss: %f; Error rate: %f" % (i_t, loss_T[-1], calculate_error(model, X, y))
             )
 
     return (model,loss_T)
 
-rt = build_model_SGD([4,4], X[0:600,:], y[0:600], print_loss=True)
+rt = build_model_SGD([4,4], X[0:600,:], y[0:600], reg_lambda = 0, converge_error = 1e-5, print_loss=True)
 model = rt[0]
 plt.plot(rt[1])
 calculate_error(model, X[600:800,:], y[600:800])
+
+'''Following part is the implementation on 4 datasets in HW2'''
+
+data1_train = pd.read_csv(r'C:\Users\Jintai\Dropbox (MIT)\_daydayup\6.867_Machine_Learning\hw2\code\data\data1_train.csv', sep=' ', header=None)
+data2_train = pd.read_csv(r'C:\Users\Jintai\Dropbox (MIT)\_daydayup\6.867_Machine_Learning\hw2\code\data\data2_train.csv', sep=' ', header=None)
+data3_train = pd.read_csv(r'C:\Users\Jintai\Dropbox (MIT)\_daydayup\6.867_Machine_Learning\hw2\code\data\data3_train.csv', sep=' ', header=None)
+data4_train = pd.read_csv(r'C:\Users\Jintai\Dropbox (MIT)\_daydayup\6.867_Machine_Learning\hw2\code\data\data4_train.csv', sep=' ', header=None)
+data1_valid = pd.read_csv(r'C:\Users\Jintai\Dropbox (MIT)\_daydayup\6.867_Machine_Learning\hw2\code\data\data1_validate.csv', sep=' ', header=None)
+data2_valid = pd.read_csv(r'C:\Users\Jintai\Dropbox (MIT)\_daydayup\6.867_Machine_Learning\hw2\code\data\data2_validate.csv', sep=' ', header=None)
+data3_valid = pd.read_csv(r'C:\Users\Jintai\Dropbox (MIT)\_daydayup\6.867_Machine_Learning\hw2\code\data\data3_validate.csv', sep=' ', header=None)
+data4_valid = pd.read_csv(r'C:\Users\Jintai\Dropbox (MIT)\_daydayup\6.867_Machine_Learning\hw2\code\data\data4_validate.csv', sep=' ', header=None)
+data1_test = pd.read_csv(r'C:\Users\Jintai\Dropbox (MIT)\_daydayup\6.867_Machine_Learning\hw2\code\data\data1_test.csv', sep=' ', header=None)
+data2_test = pd.read_csv(r'C:\Users\Jintai\Dropbox (MIT)\_daydayup\6.867_Machine_Learning\hw2\code\data\data2_test.csv', sep=' ', header=None)
+data3_test = pd.read_csv(r'C:\Users\Jintai\Dropbox (MIT)\_daydayup\6.867_Machine_Learning\hw2\code\data\data3_test.csv', sep=' ', header=None)
+data4_test = pd.read_csv(r'C:\Users\Jintai\Dropbox (MIT)\_daydayup\6.867_Machine_Learning\hw2\code\data\data4_test.csv', sep=' ', header=None)
+
+def HW2_dt_convert(df):
+    X = np.asarray(df.iloc[:,0:np.size(df,1)-1])
+    y = np.asarray(df.iloc[:,-1])
+    y = (y * (y>0)).astype(int)
+    return (X,y)
+
+d1_train = HW2_dt_convert(data1_train)
+d1_test = HW2_dt_convert(data1_train)
+rt = build_model_SGD([4,4], d1_train[0], d1_train[1], reg_lambda = 0, converge_error = 1e-5, print_loss=True)
+calculate_error(rt[0],d1_test[0],d1_test[1])
+
+d2_train = HW2_dt_convert(data2_train)
+d2_test = HW2_dt_convert(data2_train)
+rt = build_model_SGD([4,4], d2_train[0], d2_train[1], reg_lambda = 0, converge_error = 1e-5, print_loss=True)
+calculate_error(rt[0],d2_test[0],d2_test[1])
+
+d3_train = HW2_dt_convert(data3_train)
+d3_test = HW2_dt_convert(data3_train)
+rt = build_model_SGD([4,4], d3_train[0], d3_train[1], reg_lambda = 0, converge_error = 1e-5, print_loss=True)
+calculate_error(rt[0],d3_test[0],d3_test[1])
+
+d4_train = HW2_dt_convert(data4_train)
+d4_test = HW2_dt_convert(data4_train)
+rt = build_model_SGD([4,4], d4_train[0], d4_train[1], reg_lambda = 0, converge_error = 1e-5, print_loss=True)
+calculate_error(rt[0],d4_test[0],d4_test[1])
+
+'''The following part is the implementation on the MNIST dataset'''
+num_samples = 200
+
+MNIST_X = np.zeros((num_samples*10,784))
+MNIST_y = np.zeros(num_samples*10)
+for i in range(10):
+    name = '\mnist_digit_'+str(i)+'.csv'
+    temp_dir = r"C:\Users\Jintai\Dropbox (MIT)\_daydayup\6.867_Machine_Learning\hw2\code\data"
+    temp = pd.read_csv(temp_dir+name, sep=' ', header=None)
+    MNIST_X[i*num_samples:(i+1)*num_samples,:] = temp[0:num_samples]
+    MNIST_y[i*num_samples:(i+1)*num_samples] = i
+MNIST_X = 2 * MNIST_X / 255 - 1
+MNIST_y = MNIST_y.astype(int)
+
+rt = build_model_SGD([1], MNIST_X, MNIST_y, reg_lambda = 0, converge_error = 1e-5,
+                     num_passes=20 ,epsilon=0.1, print_loss=True)
