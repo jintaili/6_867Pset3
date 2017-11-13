@@ -44,7 +44,17 @@ def tanh_activation(M):
 
 # Helper function to evaluate the total loss on the dataset
 def calculate_error(model, X, y):
-    return null
+    num_examples = np.size(X, 0)
+    W1, b1, W2, b2 = model['W1'], model['b1'], model['W2'], model['b2']
+    # Forward propagation to calculate our predictions
+    z1 = X.dot(W1) + b1
+    a1 = tanh_activation(z1)
+    z2 = a1.dot(W2) + b2
+    exp_scores = np.exp(z2)
+    probs = exp_scores / np.sum(exp_scores, axis=1, keepdims=True)
+    predict = np.argmax(probs, 1)
+    same = sum(predict == y) / num_examples
+    return 1-same
 
 def calculate_loss_batch(model, X, y):
     num_examples = np.size(X, 0)
@@ -194,10 +204,14 @@ def build_model_SGD(nn_hdim, X, y, num_passes=500, print_loss=False):
         if print_loss and i % 10 == 0:
             loss_T.append(calculate_loss_batch(model, X, y))
             print(
-            "Loss after epoch %i: %f" % (i, loss_T[-1])
+                "Loss after epoch %i: %f" % (i, loss_T[-1])
+            )
+            print(
+                "Error after epoch %i: %f" % (i, calculate_error(model, X, y))
             )
 
     return (model,loss_T)
 
-
-plt.plot(build_model_SGD(3, X, y, print_loss=True)[1])
+rt = build_model_SGD(3, X, y, print_loss=True)
+model = rt[0]
+plt.plot(rt[1])
