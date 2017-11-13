@@ -17,7 +17,7 @@ nn_output_dim = 3  # output layer dimensionality
 # Gradient descent parameters (I picked these by hand)
 epsilon = 0.01  # learning rate for gradient descent
 reg_lambda = 0.01  # regularization strength
-converge_error = 1e-5
+converge_error = 1e-4
 
 def softmax(z_L):
     '''
@@ -223,6 +223,13 @@ def build_model_SGD_tanh(nn_hdim, X, y, num_passes=500, print_loss=False):
 
     return (model,loss_T)
 
+# This function learns parameters for a multilayer neural network
+# with ReLU activations and softmax output, and returns the model.
+# - nn_hdim: A list length of the number of hidden layers,
+#           each element stands for the number of nodes in each layer.
+#           Currently this NN only has one output unit.
+# - num_passes: Max number of Epochs through the training data for gradient descent
+# - print_loss: If True, print the loss every 10 epochs
 def build_model_SGD(nn_hdim, X, y, num_passes=150, print_loss=False):
     # Initialize the parameters to random values. We need to learn these.
     nn_hl = len(nn_hdim)
@@ -253,7 +260,7 @@ def build_model_SGD(nn_hdim, X, y, num_passes=150, print_loss=False):
     model = {}
 
     # Gradient descent. For each batch...
-    for i in range(0, num_passes):
+    for i_t in range(0, num_passes):
 
         indices_examples = range(num_examples)
 
@@ -313,7 +320,7 @@ def build_model_SGD(nn_hdim, X, y, num_passes=150, print_loss=False):
             # dW1 += reg_lambda * W1
 
             # Gradient descent parameter update
-            epsilon = learning_rate_SGD((i*num_examples + j+1)/2000, tau0 = 0.3, kap = 0.55)
+            epsilon = learning_rate_SGD((i_t*num_examples + j+1)/2000, tau0 = 0.3, kap = 0.55)
             epsilon = 0.01
             for i in range(len(W_h)):
                 W_h[i] += -epsilon * dW_h[i]
@@ -330,16 +337,17 @@ def build_model_SGD(nn_hdim, X, y, num_passes=150, print_loss=False):
         except: pass
         # Optionally print the loss.
         # This is expensive because it uses the whole dataset, so we don't want to do it too often.
-        if print_loss and i % 10 == 0:
+        if print_loss and i_t % 10 == 0:
             print(
-                "Loss after epoch %i: %f" % (i, loss_T[-1])
+                "Loss after epoch %i: %f" % (i_t, loss_T[-1])
             )
             print(
-                "Error after epoch %i: %f" % (i, calculate_error(model, X, y))
+                "Error after epoch %i: %f" % (i_t, calculate_error(model, X, y))
             )
 
     return (model,loss_T)
 
-rt = build_model_SGD([4,4], X, y, print_loss=True)
+rt = build_model_SGD([4,4], X[0:600,:], y[0:600], print_loss=True)
 model = rt[0]
 plt.plot(rt[1])
+calculate_error(model, X[600:800,:], y[600:800])
