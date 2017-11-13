@@ -7,8 +7,8 @@ Created on Thu Nov  2 13:28:08 2017
 """
 # test
 import os
-path = "/Volumes/Transcend/Dropbox (MIT)/2017 Fall/6.867/psets/pset3"
-data_path = path + '/hw3_resources/data'
+path = r"C:\Users\Jintai\Dropbox (MIT)\_daydayup\6.867_Machine_Learning\hw3"
+data_path = r'C:\Users\Jintai\Dropbox (MIT)\_daydayup\6.867_Machine_Learning\hw3\data'
 os.chdir(path)
 
 import numpy as np
