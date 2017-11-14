@@ -346,6 +346,10 @@ def build_model_SGD(nn_hdim, X, y, reg_lambda = 0.01, converge_error = 1e-4, eps
             # Assign new parameters to the model
             model = {'W_h': W_h, 'b_h': b_h}
 
+        temp_loss = calculate_loss_batch(model, X, y, reg_lambda)
+        if np.isnan(temp_loss):
+            print('Loss Nan')
+            break
         loss_T.append(calculate_loss_batch(model, X, y, reg_lambda))
         try:
             if np.abs(loss_T[-1] - loss_T[-2]) < converge_error:
@@ -361,7 +365,7 @@ def build_model_SGD(nn_hdim, X, y, reg_lambda = 0.01, converge_error = 1e-4, eps
 
     return (model,loss_T)
 
-rt = build_model_SGD([4,4], X[0:600,:], y[0:600], reg_lambda = 0, converge_error = 1e-5, print_loss=True)
+rt = build_model_SGD([4,4,4], X[0:600,:], y[0:600], reg_lambda = 0, converge_error = 1e-5, print_loss=True)
 model = rt[0]
 plt.plot(rt[1])
 calculate_error(model, X[600:800,:], y[600:800])
@@ -416,10 +420,10 @@ for i in range(10):
     name = '\mnist_digit_'+str(i)+'.csv'
     temp_dir = r"C:\Users\Jintai\Dropbox (MIT)\_daydayup\6.867_Machine_Learning\hw2\code\data"
     temp = pd.read_csv(temp_dir+name, sep=' ', header=None)
-    MNIST_X[i*num_samples:(i+1)*num_samples,:] = temp[0:num_samples]
+    MNIST_X[i*num_samples:(i+1)*num_samples,:] = np.asarray(temp.iloc[0:num_samples,:])
     MNIST_y[i*num_samples:(i+1)*num_samples] = i
 MNIST_X = 2 * MNIST_X / 255 - 1
 MNIST_y = MNIST_y.astype(int)
 
-rt = build_model_SGD([1], MNIST_X, MNIST_y, reg_lambda = 0, converge_error = 1e-5,
-                     num_passes=20 ,epsilon=0.1, print_loss=True)
+rt = build_model_SGD([5], MNIST_X, MNIST_y, reg_lambda = 0.01, converge_error = 1e-5,
+                     num_passes=20 ,epsilon=0.6, print_loss=True)
