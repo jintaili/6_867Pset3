@@ -2,6 +2,7 @@ import numpy as np
 import os
 import pandas as pd
 import matplotlib.pyplot as plt
+from plotBoundary import *
 
 data_path = r'C:\Users\Jintai\Dropbox (MIT)\_daydayup\6.867_Machine_Learning\hw3\data'
 os.chdir(data_path)
@@ -43,6 +44,9 @@ def tanh_activation(M):
     '''
     return np.tanh(M)
 
+def draw_MNIST(vector):
+    plt.imshow(vector.reshape((28,28)), cmap='gray')
+
 def predict(model, X):
     num_examples = np.size(X, 0)
     W_h, b_h = model['W_h'], model['b_h']
@@ -74,8 +78,11 @@ def calculate_error(model, X, y):
     exp_scores = np.exp(z)
     probs = exp_scores / np.sum(exp_scores, axis=1, keepdims=True)
     predict = np.argmax(probs, 1)
-    same = sum(predict == y) / num_examples
+    same = np.sum(predict == y) / num_examples
     return 1-same
+
+def predict_one(x):
+    return np.argmax(predict(model,x))
 
 def calculate_loss_batch(model, X, y, reg_lambda):
     num_examples = np.size(X, 0)
@@ -247,9 +254,12 @@ def build_model_SGD_tanh(nn_hdim, X, y, num_passes=500, print_loss=False):
 # - converge_error: Stop criterion: absolute difference in consecutive run loss.
 # - num_passes: Max number of Epochs through the training data for gradient descent
 # - print_loss: If True, print the loss every 10 epochs
-def build_model_SGD(nn_hdim, X, y, reg_lambda = 0.01, converge_error = 1e-4, epsilon = 0.01,
-                    num_passes=150, print_loss=False):
+def build_model_SGD(nn_hdim, X, y, X_valid = None, y_valid = None, reg_lambda = 0.01, converge_error = 1e-4, epsilon = 0.01,
+                    num_passes=150, early_stop = False, early_stop_error = 0.05, print_loss=False):
     # Initialize the parameters to random values. We need to learn these.
+    if X_valid is None and early_stop:
+        print('Early stop cannot be performed without validation data.')
+        return None
     nn_hl = len(nn_hdim)
     num_examples = np.size(X, 0)
     nn_input_dim = np.size(X, 1)
@@ -314,6 +324,7 @@ def build_model_SGD(nn_hdim, X, y, reg_lambda = 0.01, converge_error = 1e-4, eps
 
             delta_L = np.copy(probs)
             delta_L[0,y_pt] -= 1
+
             # dW2 = (a_h[-1].T).dot(delta_L)
             # db2 = delta_L
 
@@ -346,6 +357,11 @@ def build_model_SGD(nn_hdim, X, y, reg_lambda = 0.01, converge_error = 1e-4, eps
             # Assign new parameters to the model
             model = {'W_h': W_h, 'b_h': b_h}
 
+            if early_stop:
+                if calculate_error(model, X_valid, y_valid) < early_stop_error:
+                    loss_T.append(calculate_loss_batch(model, X, y, reg_lambda))
+                    return (model,loss_T)
+
         temp_loss = calculate_loss_batch(model, X, y, reg_lambda)
         if np.isnan(temp_loss):
             print('Loss Nan')
@@ -359,16 +375,28 @@ def build_model_SGD(nn_hdim, X, y, reg_lambda = 0.01, converge_error = 1e-4, eps
         # Optionally print the loss.
         # This is expensive because it uses the whole dataset, so we don't want to do it too often.
         if print_loss:# and i_t % 10 == 0:
-            print(
-                "After epoch %i - Loss: %f; Error rate: %f" % (i_t, loss_T[-1], calculate_error(model, X, y))
-            )
+            if X_valid is None:
+                print(
+                    "After epoch %i - Loss: %f; Error rate: %f" % (i_t, loss_T[-1], calculate_error(model, X, y))
+                )
+            else:
+                print(
+                    "After epoch %i - Loss: %f; Error rate: %f; Validation error: %f" %
+                    (i_t, loss_T[-1], calculate_error(model, X, y), calculate_error(model, X_valid, y_valid))
+                )
 
     return (model,loss_T)
 
-rt = build_model_SGD([4,4,4], X[0:600,:], y[0:600], reg_lambda = 0, converge_error = 1e-5, print_loss=True)
+train_ind = np.random.randint(0,800,600)
+valid_ind = np.setdiff1d(np.arange(800), train_ind)
+rt = build_model_SGD([4], X[train_ind,:], y[train_ind], reg_lambda = 0.0, converge_error = 1e-6, print_loss=True)
 model = rt[0]
 plt.plot(rt[1])
-calculate_error(model, X[600:800,:], y[600:800])
+plt.xlabel('Number of epochs')
+plt.ylabel('Mean cross-entropy loss')
+calculate_error(model, X[valid_ind,:], y[valid_ind])
+
+np.linalg.norm(rt[0]['W_h'][0])
 
 '''Following part is the implementation on 4 datasets in HW2'''
 
@@ -391,39 +419,115 @@ def HW2_dt_convert(df):
     y = (y * (y>0)).astype(int)
     return (X,y)
 
+def plotDecisionBoundary(X, Y, scoreFn, values, title = ""):
+    # Plot the decision boundary. For that, we will asign a score to
+    # each point in the mesh [x_min, m_max]x[y_min, y_max].
+    x_min, x_max = X[:, 0].min() - 1, X[:, 0].max() + 1
+    y_min, y_max = X[:, 1].min() - 1, X[:, 1].max() + 1
+    h = max((x_max-x_min)/200., (y_max-y_min)/200.)
+    xx, yy = meshgrid(arange(x_min, x_max, h),
+                      arange(y_min, y_max, h))
+    zz = array([scoreFn(x) for x in c_[xx.ravel(), yy.ravel()]])
+    zz = zz.reshape(xx.shape)
+    plt.figure()
+    CS = plt.contour(xx, yy, zz, values, colors = 'green', linestyles = 'solid', linewidths = 2)
+    plt.clabel(CS, fontsize=9, inline=1)
+    # Plot the training points
+    plt.scatter(X[:, 0], X[:, 1], c=(1.-Y), s=50)
+    plt.title(title)
+    plt.axis('tight')
+
+
 d1_train = HW2_dt_convert(data1_train)
 d1_test = HW2_dt_convert(data1_train)
 rt = build_model_SGD([4,4], d1_train[0], d1_train[1], reg_lambda = 0, converge_error = 1e-5, print_loss=True)
+model = rt[0]
+plt.plot(rt[1])
+plt.xlabel('Number of epochs')
+plt.ylabel('Mean cross-entropy loss')
 calculate_error(rt[0],d1_test[0],d1_test[1])
 
+plotDecisionBoundary(d1_train[0], d1_train[1], predict_one, 0, title = "")
+
 d2_train = HW2_dt_convert(data2_train)
+d2_valid = HW2_dt_convert(data2_valid)
 d2_test = HW2_dt_convert(data2_train)
-rt = build_model_SGD([4,4], d2_train[0], d2_train[1], reg_lambda = 0, converge_error = 1e-5, print_loss=True)
-calculate_error(rt[0],d2_test[0],d2_test[1])
+
+rt = build_model_SGD([16,8], d2_train[0], d2_train[1], reg_lambda = 0, converge_error = 1e-5, print_loss=True)
+model = rt[0]
+plt.figure()
+plt.plot(rt[1])
+plt.ylim((0,1))
+plt.xlabel('Number of epochs')
+plt.ylabel('Mean cross-entropy loss')
+print(calculate_error(rt[0],d2_valid[0],d2_valid[1]))
+print(calculate_error(rt[0],d2_test[0],d2_test[1]))
+plotDecisionBoundary(d2_train[0], d2_train[1], predict_one, 0, title = "")
+
 
 d3_train = HW2_dt_convert(data3_train)
 d3_test = HW2_dt_convert(data3_train)
 rt = build_model_SGD([4,4], d3_train[0], d3_train[1], reg_lambda = 0, converge_error = 1e-5, print_loss=True)
+model = rt[0]
+plt.plot(rt[1])
+plt.xlabel('Number of epochs')
+plt.ylabel('Mean cross-entropy loss')
 calculate_error(rt[0],d3_test[0],d3_test[1])
+plotDecisionBoundary(d3_train[0], d3_train[1], predict_one, 0, title = "")
 
 d4_train = HW2_dt_convert(data4_train)
 d4_test = HW2_dt_convert(data4_train)
 rt = build_model_SGD([4,4], d4_train[0], d4_train[1], reg_lambda = 0, converge_error = 1e-5, print_loss=True)
+model = rt[0]
+plt.plot(rt[1])
+plt.xlabel('Number of epochs')
+plt.ylabel('Mean cross-entropy loss')
 calculate_error(rt[0],d4_test[0],d4_test[1])
+plotDecisionBoundary(d4_train[0], d4_train[1], predict_one, 0, title = "")
+
 
 '''The following part is the implementation on the MNIST dataset'''
 num_samples = 200
 
 MNIST_X = np.zeros((num_samples*10,784))
 MNIST_y = np.zeros(num_samples*10)
+MNIST_X_valid = np.zeros((num_samples*10,784))
+MNIST_y_valid = np.zeros(num_samples*10)
 for i in range(10):
     name = '\mnist_digit_'+str(i)+'.csv'
     temp_dir = r"C:\Users\Jintai\Dropbox (MIT)\_daydayup\6.867_Machine_Learning\hw2\code\data"
     temp = pd.read_csv(temp_dir+name, sep=' ', header=None)
-    MNIST_X[i*num_samples:(i+1)*num_samples,:] = np.asarray(temp.iloc[0:num_samples,:])
-    MNIST_y[i*num_samples:(i+1)*num_samples] = i
-MNIST_X = 2 * MNIST_X / 255 - 1
-MNIST_y = MNIST_y.astype(int)
+    nrow = np.shape(temp)[0]
+    MNIST_train = np.random.randint(0,nrow,200)
+    MNIST_valid = np.random.randint(0,nrow-num_samples,200)
+    MNIST_valid = np.setdiff1d(np.arange(nrow), MNIST_train)[MNIST_valid]
 
-rt = build_model_SGD([5], MNIST_X, MNIST_y, reg_lambda = 0.01, converge_error = 1e-5,
-                     num_passes=20 ,epsilon=0.6, print_loss=True)
+    MNIST_X[i*num_samples:(i+1)*num_samples,:] = np.asarray(temp.iloc[MNIST_train,:])
+    MNIST_y[i*num_samples:(i+1)*num_samples] = i
+    MNIST_X_valid[i*num_samples:(i+1)*num_samples,:] = np.asarray(temp.iloc[MNIST_valid,:])
+    MNIST_y_valid[i*num_samples:(i+1)*num_samples] = i
+MNIST_X = 2 * MNIST_X / 255 - 1
+MNIST_X_valid = 2 * MNIST_X_valid / 255 - 1
+MNIST_y = MNIST_y.astype(int)
+MNIST_y_valid = MNIST_y_valid.astype(int)
+
+
+
+rt = build_model_SGD([16,16, 16], MNIST_X, MNIST_y, X_valid=MNIST_X_valid, y_valid=MNIST_y_valid,
+                     reg_lambda = 0.00, converge_error = 1e-5,
+                     early_stop= False, early_stop_error=0.05,
+                     num_passes=60 ,epsilon=1e-3, print_loss=True)
+
+rt = build_model_SGD([16,16], MNIST_X, MNIST_y, X_valid=MNIST_X_valid, y_valid=MNIST_y_valid,
+                     reg_lambda = 0.00, converge_error = 1e-5,
+                     early_stop= True, early_stop_error=0.05,
+                     num_passes=15 ,epsilon=1e-4, print_loss=True)
+
+model_MNIST = rt[0]
+print('Validation error: %f'% calculate_error(model_MNIST, MNIST_X_valid, MNIST_y_valid))
+
+ex = np.random.randint(0, 10*num_samples, 1)
+ex_x = MNIST_X_valid[ex,:]
+ex_y = MNIST_y_valid[ex]
+draw_MNIST(ex_x)
+print('Prediction: %i'%predict_one(ex_x))
